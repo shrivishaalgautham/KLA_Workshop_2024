@@ -31,6 +31,32 @@ class Step:
         self.dependecy = dependency
         self.machines = machines
 
+def find_min(wafer):
+    min_step = None
+    min_time = sys.maxsize
+    min_mach = None
+    for i in range(len(wafer.steps)):
+        if wafer.done[i]:
+            continue
+        flag = 0
+        if wafer.steps[i] not in no_dependency_steps:
+            for k in range(sorted_steps.index(wafer.steps[i]) - 1, -1, -1):
+                try:
+                    index = wafer.steps.index(sorted_steps[k])
+                except:
+                    continue
+                if not wafer.done[index]:
+                    flag = 1
+            if flag == 1:
+                continue
+        for mach in machines_map[wafer.steps[i]].machines:
+            if mach.endtime < min_time:
+                min_time = mach.endtime
+                min_step = i
+                min_mach = mach
+    wafer.done[min_step] = True
+    return min_step,min_mach
+
 def topologicalSorting(dependency,indegree,no_dependency_step):
 
     stack = []
@@ -47,10 +73,25 @@ def topologicalSorting(dependency,indegree,no_dependency_step):
                 queue.insert(0,i)
     return stack
 
+def check_para(mach,step):
+    step_obj = machines_map[step]
+    if mach.current_para < step_obj.parameters[0] or mach.current_para > step_obj.parameters[1]:
+        mach.endtime += mach.cooldown
+        mach.current_para = mach.initial_para
 
+def perform(type,step,dur,last,machine):
+    start = max(machine.endtime,last)
+    machine.endtime = start + dur
+    schedule['schedule'].append({'wafer_id':type,'step':step,'start_time':start,'machine':machine.mach_id,'end_time':machine.endtime})
+    machine.processed += 1
+    if machine.processed == machine.num:
+        machine.current_para += machine.fluc
+        machine.processed = 0
+        check_para(machine,step)
 
+    return machine.endtime
 
-with open(r"C:\Users\csuser\Desktop\Wafer processing optimization\Input\Milestone5b.json") as file:
+with open(r"C:\Users\csuser\Desktop\Wafer processing optimization\Input\Milestone4a.json") as file:
     data = json.load(file)
 
 steps = {}
@@ -95,51 +136,7 @@ schedule = {'schedule':[]}
 completed = 0
 n = len(wafers)
 
-def check_para(mach,step):
-    step_obj = machines_map[step]
-    if mach.current_para < step_obj.parameters[0] or mach.current_para > step_obj.parameters[1]:
-        mach.endtime += mach.cooldown
-        mach.current_para = mach.initial_para
-test = []
-def perform(type,step,dur,last,machine):
-    start = max(machine.endtime,last)
-    machine.endtime = start + dur
-    schedule['schedule'].append({'wafer_id':type,'step':step,'start_time':start,'machine':machine.mach_id,'end_time':machine.endtime})
-    test.append([type,step,machine.mach_id,machine.current_para,machine.processed,machine.endtime])
-    machine.processed += 1
-    if machine.processed == machine.num:
-        machine.current_para += machine.fluc
-        machine.processed = 0
-        check_para(machine,step)
-
-    return machine.endtime
-
-def find_min(wafer):
-    min_step = None
-    min_time = sys.maxsize
-    min_mach = None
-    for i in range(len(wafer.steps)):
-        if wafer.done[i]:
-            continue
-        flag = 0
-        if wafer.steps[i] not in no_dependency_steps:
-            for k in range(sorted_steps.index(wafer.steps[i]) - 1, -1, -1):
-                print(no_dependency_steps)
-                try:
-                    index = wafer.steps.index(sorted_steps[k])
-                except:
-                    continue
-                if not wafer.done[index]:
-                    flag = 1
-            if flag == 1:
-                continue
-        for mach in machines_map[wafer.steps[i]].machines:
-            if mach.endtime < min_time:
-                min_time = mach.endtime
-                min_step = i
-                min_mach = mach
-    wafer.done[min_step] = True
-    return min_step,min_mach
+wafers = sorted(wafers, key = lambda x: sum(x.time),reverse = True)
 
 while completed < n:
     for wafer in wafers:
@@ -150,5 +147,6 @@ while completed < n:
         wafer.last_time = perform(wafer.type,wafer.steps[index],wafer.time[index],wafer.last_time,mach)
         wafer.count += 1
 
-with open("output5b.json","w") as file:
+with open("output4atest.json","w") as file:
     json.dump(schedule,file,indent=4)
+            
