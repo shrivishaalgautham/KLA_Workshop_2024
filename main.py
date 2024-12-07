@@ -54,8 +54,10 @@ def find_min(wafer):
                 min_time = mach.endtime
                 min_step = i
                 min_mach = mach
+    if min_mach is None:
+        return min_step,min_mach,False
     wafer.done[min_step] = True
-    return min_step,min_mach
+    return min_step,min_mach,True
 
 def topologicalSorting(dependency,indegree,no_dependency_step):
 
@@ -91,7 +93,7 @@ def perform(type,step,dur,last,machine):
 
     return machine.endtime
 
-with open(r"C:\Users\csuser\Desktop\Wafer processing optimization\Input\Milestone4a.json") as file:
+with open(r"C:\Users\csuser\Desktop\Wafer processing optimization\Input\Milestone4c.json") as file:
     data = json.load(file)
 
 steps = {}
@@ -139,14 +141,21 @@ n = len(wafers)
 wafers = sorted(wafers, key = lambda x: sum(x.time),reverse = True)
 
 while completed < n:
+    min_last = sys.maxsize
+    min_wafer = None
     for wafer in wafers:
         if wafer.count == len(wafer.steps):
-            completed += 1
             continue
-        index,mach = find_min(wafer)
-        wafer.last_time = perform(wafer.type,wafer.steps[index],wafer.time[index],wafer.last_time,mach)
-        wafer.count += 1
+        if wafer.last_time < min_last:
+            min_wafer = wafer
+            min_last = sum(wafer.done)
+    index,mach,check = find_min(min_wafer)
+    if not check:
+        continue
+    min_wafer.last_time = perform(min_wafer.type,min_wafer.steps[index],min_wafer.time[index],min_wafer.last_time,mach)
+    min_wafer.count += 1
+    if min_wafer.count == len(min_wafer.steps):
+        completed += 1
 
-with open("output4atest.json","w") as file:
+with open("output4ctest.json","w") as file:
     json.dump(schedule,file,indent=4)
-            
