@@ -13,10 +13,13 @@ class Wafer:
         self.time = time
 
 class Machine:
-    def __init__(self,mach_id,step_id,initial_para,fluc,num):
+    def __init__(self,mach_id,step_id,cooldown,initial_para,fluc,num):
         self.mach_id = mach_id
         self.step_id = step_id
+        self.cooldown = cooldown
         self.initial_para = initial_para
+        self.current_para = initial_para
+        self.processed = 0
         self.fluc = fluc
         self.num = num
         self.endtime = 0
@@ -32,22 +35,19 @@ with open(r"C:\Users\csuser\Desktop\Wafer processing optimization\Input\Mileston
 
 steps = {}
 for mach in data['machines']:
-    temp = Machine(mach['machine_id'],mach['step_id'],mach['initial_parameters'],mach['fluctuation'],mach['n'])
+    temp = Machine(mach['machine_id'],mach['step_id'],mach['cooldown_time'],mach['initial_parameters']["P1"],mach['fluctuation']["P1"],mach['n'])
     if mach['step_id'] in steps.keys():
         steps[mach['step_id']].append(temp)
     else:
         steps[mach['step_id']] = [copy.deepcopy(temp)]
-'''for i in range(len(data['steps'])):
-    for j in data['steps'][i]:
-        depe'''
 
 machines_map = {}
 for step in data['steps']:
-    temp = Step(step['id'],step['parameters'],step['dependency'],steps[step['id']])
+    temp = Step(step['id'],step['parameters']['P1'],step['dependency'],steps[step['id']])
     machines_map[step['id']] = temp
 wafers = []
 
-print(machines_map['S2'].machines)
+
 
 for wafer in data['wafers']:
     for i in range(wafer['quantity']):
@@ -57,10 +57,22 @@ schedule = {'schedule':[]}
 completed = 0
 n = len(wafers)
 
+def check_para(mach,step):
+    step_obj = machines_map[step]
+    if mach.current_para < step_obj.parameters[0] or mach.current_para > step_obj.parameters[1]:
+        mach.endtime += mach.cooldown
+        mach.current_para = mach.initial_para
+
 def perform(type,step,dur,last,machine):
     start = max(machine.endtime,last)
     machine.endtime = start + dur
     schedule['schedule'].append({'wafer_id':type,'step':step,'start_time':start,'machine':machine.mach_id,'end_time':machine.endtime})
+    machine.processed += 1
+    if machine.processed == machine.num:
+        machine.current_para += machine.fluc
+        machine.processed = 0
+        check_para(machine,step)
+
     return machine.endtime
 
 def find_min(wafer):
@@ -78,30 +90,14 @@ def find_min(wafer):
     wafer.done[min_step] = True
     return min_step,min_mach
 
-'''while completed < n:
-
-    for wafer in wafers:
-        min_time = 0
-        min_step = 0
-        for i in range(len(wafer.steps)):
-            if not wafer.done[i]:
-                wafer.last_time = perform(wafer.type,wafer.steps[i],wafer.time[i],wafer.last_time)
-                wafer.done[i] = True
-                wafer.count += 1
-                break
-            print(completed)
-        
-        if wafer.count == len(wafer.steps):
-            completed += 1'''
-
 while completed < n:
     for wafer in wafers:
         if wafer.count == len(wafer.steps):
             completed += 1
             continue
-        i,mach = find_min(wafer)
-        wafer.last_time = perform(wafer.type,wafer.steps[i],wafer.time[i],wafer.last_time,mach)
+        index,mach = find_min(wafer)
+        wafer.last_time = perform(wafer.type,wafer.steps[index],wafer.time[index],wafer.last_time,mach)
         wafer.count += 1
+
 with open("output3a.json","w") as file:
-    json.dump(schedule,file,ensure_ascii=False,allow_nan=False,indent=4)
-            
+    json.dump(schedule,file,indent=4)
